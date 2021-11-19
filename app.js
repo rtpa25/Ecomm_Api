@@ -8,18 +8,21 @@ const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const swaggerDocument = YAML.load('./swagger.yaml');
 
-//configure dotenv
-require('dotenv').config();
-
 //Routes import statements
 const home = require('./routes/home');
+const user = require('./routes/userRoute');
 
 //initialialize the app
 const app = express();
 
 //cookies and file middleware
 app.use(cookieParser());
-app.use(fileupload());
+app.use(
+  fileupload({
+    useTempFiles: true,
+    tempFileDir: '/temp/',
+  })
+);
 
 //middleware for swagger docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
@@ -33,6 +36,7 @@ app.use(morgan('tiny'));
 
 //router middleware
 app.use('/api/v1', home);
+app.use('/api/v1', user);
 
 //export app
 module.exports = app;
