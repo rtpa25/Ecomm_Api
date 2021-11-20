@@ -279,4 +279,265 @@ exports.getLoggedInUserDetails = async (req, res, next) => {
       message: error.message,
     });
   }
+  next();
+};
+
+//-----CHANGE_PASSWORD CONTROLLER ----//
+exports.changePassword = async (req, res, next) => {
+  try {
+    //user id accessed by middleware injection to request object
+    const userId = req.user.id;
+    //access the oldpassword and the newpassword from the client
+    const { oldPassword, newPassword } = req.body;
+    //find the user with the id and ovvertite the select false on the password
+    const user = await User.findById({ _id: userId }).select('+password');
+    //check if old password is correct
+    const isCorrectOldPassword = await user.isValidPassword(oldPassword);
+    if (!isCorrectOldPassword) {
+      res.status(400).json({
+        sucess: false,
+        message: 'Old password is incorrect',
+      });
+    }
+    //set password to the new password
+    user.password = newPassword;
+    //save the changes
+    await user.save();
+    //give the token and return the response by cookieToken function
+    cookieToken(user, res);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----UPDATE_USER_DETAILS CONTROLLER ----//
+exports.updateUserDetails = async (req, res, next) => {
+  try {
+    const { id } = req.user;
+    const { name, email } = req.body;
+    const { photo } = req.files;
+
+    //check if there is no name or email from the client
+    if (!(name || email || photo)) {
+      res.status(400).json({
+        sucess: false,
+        message: 'change something to send an update request',
+      });
+    }
+    //new data is the patched data that needs to saved in the db
+    const newData = {
+      name: name,
+      email: email,
+    };
+    //if files exists in the request object's files property
+    if (photo) {
+      const user = await User.findById(id);
+      const imageId = user.photo.id;
+
+      //delete the current photo from cloudinary
+      await cloudinary.uploader.destroy(imageId);
+
+      //uploads the photo to cloudinary media library
+      const result = await cloudinary.uploader.upload(photo.tempFilePath, {
+        folder: 'users',
+        width: 150,
+        crop: 'scale',
+      });
+
+      //insert photo details to the new data object
+      newData.photo = {
+        id: result.public_id,
+        secure_url: result.secure_url,
+      };
+    }
+    //finds the user by id in the db and updates the user
+    const user = await User.findByIdAndUpdate(id, newData, {
+      new: true,
+      runValidators: true,
+      useFindAndModify: false,
+    });
+
+    //send the new user data back so that we save a get request in the client
+    res.status(200).json({
+      sucess: true,
+      user: user,
+    });
+  } catch (error) {
+    //in case of server down or fuckups from our side or internet issues with the client
+    console.log(error);
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----ADMIN_GET_ALL_USERS CONTROLLER ----//
+exports.adminAllUser = async (req, res, next) => {
+  try {
+    const users = await User.find({});
+    res.status(200).json({
+      sucess: true,
+      users: users,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----ADMIN_GET_SINGLE_USER CONTROLLER ----//
+exports.adminGetUserData = async (req, res, next) => {
+  try {
+    //get id by params
+    const { id } = req.params;
+    //find user from db
+    const user = await User.findById(id);
+    if (!user) {
+      res.status(400).json({
+        sucess: false,
+        message: 'no such user exists',
+      });
+    }
+    res.status(200).json({
+      sucess: true,
+      user: user,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----ADMIN_UPDATE_SINGLE_USER CONTROLLER ----//
+exports.adminUpdateOneUserDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, email, role } = req.body;
+
+    //check if there is no name or email from the client
+    if (!(name || email || req.files)) {
+      res.status(400).json({
+        sucess: false,
+        message: 'change something to send an update request',
+      });
+    }
+    //new data is the patched data that needs to saved in the db
+    const newData = {
+      name: name,
+      email: email,
+      role: role,
+    };
+    //if files exists in the request object's files property
+    if (req.files) {
+      const { photo } = req.files;
+      const user = await User.findById(id);
+      const imageId = user.photo.id;
+
+      //delete the current photo from cloudinary
+      await cloudinary.uploader.destroy(imageId);
+
+      //uploads the photo to cloudinary media library
+      const result = await cloudinary.uploader.upload(photo.tempFilePath, {
+        folder: 'users',
+        width: 150,
+        crop: 'scale',
+      });
+
+      //insert photo details to the new data object
+      newData.photo = {
+        id: result.public_id,
+        secure_url: result.secure_url,
+      };
+    }
+    //finds the user by id in the db and updates the user
+    const user = await User.findByIdAndUpdate(id, newData, {
+      new: true,
+      runValidators: true,
+      useFindAndModify: false,
+    });
+
+    //send the new user data back so that we save a get request in the client
+    res.status(200).json({
+      sucess: true,
+      user: user,
+    });
+  } catch (error) {
+    //in case of server down or fuckups from our side or internet issues with the client
+    console.log(error);
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----ADMIN_DELETE_USER CONTROLLER ----//
+exports.adminDeleteUser = async (req, res, next) => {
+  try {
+    //get id from params
+    const { id } = req.params;
+
+    //fetch user from the db
+    const user = await User.findById(id);
+    if (!user) {
+      res.status(401).json({
+        sucess: false,
+        message: 'No such user exists check the params',
+      });
+    }
+    //get image id and delete the photo from cloudinary
+    const imageId = user.photo.id;
+    await cloudinary.uploader.destroy(imageId);
+
+    //remove the user from the db
+    await user.remove();
+
+    //send sucess message
+    res.status(200).json({
+      sucess: true,
+      message: 'User sucessfully deleted',
+    });
+  } catch (error) {
+    //error on server side
+    console.log(error);
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----MANAGER CONTROLLER ----//
+exports.managerAllUser = async (req, res, next) => {
+  try {
+    const users = await User.find({ role: 'user' });
+    res.status(200).json({
+      sucess: true,
+      users: users,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
 };
