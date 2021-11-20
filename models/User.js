@@ -22,6 +22,7 @@ const UserSchema = new Schema({
     required: [true, 'Email is a required field'],
     validate: [validator.isEmail, 'Please give a valid email'],
     unique: true, //automatically look in the db if this email already exists
+    trim: true,
   },
   password: {
     type: String,
@@ -93,4 +94,5 @@ UserSchema.methods.getForgotPasswordToken = function () {
   return forgotToken;
 };
 
+//collectio will be callsed users
 module.exports = mongoose.model('User', UserSchema);
