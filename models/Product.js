@@ -47,6 +47,11 @@ const ProductSchema = new Schema({
         'please select category from: short-sleves, long-sleves, sweat-shirts & hoodies',
     },
   },
+  //updated later
+  stock: {
+    type: Number,
+    required: [true, 'Please add a number to the stock'],
+  },
   brand: {
     type: String,
     required: [true, 'Please add a brand for clothing'],
