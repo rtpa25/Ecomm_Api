@@ -11,6 +11,9 @@ const {
   getAllProductsAdmin,
   updateProduct,
   deleteProduct,
+  addReview,
+  deleteReview,
+  getReviewForOneProduct,
 } = require('../controllers/productController');
 
 //import middleware
@@ -20,14 +23,21 @@ const { isLoggedIn, customRole } = require('../middlewares/userMiddleware');
 const router = express.Router();
 
 /*****************************************USER ROUTES******************************************/
-/*   /api/v1/demo   */
-router.route('/demo').get();
 
 /*   /api/v1/products   */
 router.route('/products').get(getAllProduct);
 
 /*   /api/v1/product/:id  */
 router.route('/product/:id').get(getOneProduct);
+
+/*   /api/v1/postReview  */
+router.route('/postReview').put(isLoggedIn, addReview);
+
+/*   /api/v1/getReviews/:productId  */
+router.route('/getReviews/:productId').get(getReviewForOneProduct);
+
+/*   /api/v1/deleteReview/:productId  */
+router.route('/deleteReview/:productId').put(isLoggedIn, deleteReview);
 
 /*****************************************ADMIN ONLY******************************************/
 

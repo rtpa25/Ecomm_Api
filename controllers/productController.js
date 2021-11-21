@@ -62,6 +62,137 @@ exports.getOneProduct = async (req, res, next) => {
   next();
 };
 
+//-----ADD_REVIEW CONTROLLER ----//
+exports.addReview = async (req, res, next) => {
+  try {
+    //get all the info from request object
+    const { rating, comment, productId } = req.body;
+    //construct user review
+    const review = {
+      user: req.user._id,
+      name: req.user.name,
+      rating: Number(rating),
+      comment: comment,
+    };
+    //fetch the product that is being reviewed
+    let product = await Product.findById(productId);
+    //check if the same user has already reviewed the product
+    let alreadyReview = product.reviews.find(
+      (rev) => rev.user.toString() === req.user._id.toString()
+    );
+    //if alreadyReviewed then update
+    if (alreadyReview) {
+      product.reviews.forEach((review) => {
+        if (review.user.toString() === req.user._id.toString()) {
+          review.comment = comment;
+          review.rating = rating;
+        }
+      });
+      //if not reviewed already then add review
+    } else {
+      product.reviews.push(review);
+      product.numberOfReviews = product.reviews.length;
+    }
+    //calculate the new ratings of the product
+    product.ratings =
+      product.reviews.reduce((acc, item) => item.rating + acc, 0) /
+      product.reviews.length;
+    //save the product into the db
+    await product.save({
+      validateBeforeSave: false,
+    });
+    //send a success message
+    res.status(200).json({
+      sucess: true,
+      message: 'Review added successfully',
+    });
+  } catch (error) {
+    console.log(error);
+    //server error
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----DELETE_REVIEW CONTROLLER ----//
+exports.deleteReview = async (req, res, next) => {
+  try {
+    //get the product with the id from the params
+    const { productId } = req.params;
+    const product = await Product.findById(productId);
+
+    //new reviews that does not have the value that is to be deleted
+    //DONT SKIP CURLY BRACKETS HERE YOU WILL GET AN ERROR
+    const reviews = product.reviews.filter((rev) => {
+      rev.user.toString() === req.user._id.toString();
+    });
+
+    //updated length
+    const numberOfReviews = reviews.length;
+
+    // updated average rating
+    const ratings =
+      numberOfReviews === 0
+        ? 0
+        : reviews.reduce((acc, item) => item.rating + acc, 0) / numberOfReviews;
+
+    //update in the db
+    await Product.findByIdAndUpdate(
+      productId,
+      {
+        reviews,
+        ratings,
+        numberOfReviews,
+      },
+      {
+        new: true,
+        runValidators: true,
+        useFindAndModify: false,
+      }
+    );
+
+    //success message
+    res.status(200).json({
+      sucess: true,
+      message: 'Review deleted successfully',
+    });
+  } catch (error) {
+    console.log(error);
+    //server error
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
+//-----GET_REVIEW CONTROLLER ----//
+exports.getReviewForOneProduct = async (req, res, next) => {
+  try {
+    //get all the reviews of a certain product form from the db
+    const { productId } = req.params;
+    const product = await Product.findById(productId);
+    const reviews = product.reviews;
+    //give the reviews
+    res.status(200).json({
+      sucess: true,
+      reviews: reviews,
+    });
+  } catch (error) {
+    console.log(error);
+    //server error
+    res.status(500).json({
+      sucess: false,
+      message: error.message,
+    });
+  }
+  next();
+};
+
 //-----ADMIN_GET_ALL_PRODUCTS CONTROLLER ----//
 exports.getAllProductsAdmin = async (req, res, next) => {
   try {
@@ -139,7 +270,7 @@ exports.addProduct = async (req, res, next) => {
 //-----ADMIN_UPDATE_PRODUCT CONTROLLER ----//
 exports.updateProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    let product = await Product.findById(req.params.id);
     if (!product) {
       res.status(401).json({
         sucess: false,
@@ -149,9 +280,7 @@ exports.updateProduct = async (req, res, next) => {
     let imagesArray = [];
     if (req.files) {
       for (let i = 0; i < product.photos.length; i++) {
-        const response = await cloudinary.uploader.destroy(
-          product.photos[i].id
-        );
+        await cloudinary.uploader.destroy(product.photos[i].id);
       }
       //extract photos the request object
       const { photos } = req.files;
@@ -196,7 +325,7 @@ exports.updateProduct = async (req, res, next) => {
 //-----ADMIN_DELETE_PRODUCT CONTROLLER ----//
 exports.deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    let product = await Product.findById(req.params.id);
 
     if (!product) {
       res.status(401).json({
